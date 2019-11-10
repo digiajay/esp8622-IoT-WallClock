@@ -9,3 +9,4 @@ This will be a simple project on Wemos D1 Mini for building an IoT Clock.
 - Standard enclosure to look as good as end-product.  May be a 3D printed one if not found standard enclosures.
 - Web server to get user configurations (like WiFi credentials, news feed preferences, weather preferences, tweet feeds etc..)
 - OTA Update
+- Scheduler to schedule the different functions and looks parallel activities.  Retrieving (or synchronizaing) time and weather data takes long time than usual and scheduler would help in keep running the clock.
