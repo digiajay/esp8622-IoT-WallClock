@@ -10,3 +10,8 @@ This will be a simple project on Wemos D1 Mini for building an IoT Clock.
 - Web server to get user configurations (like WiFi credentials, news feed preferences, weather preferences, tweet feeds etc..)
 - OTA Update
 - Scheduler to schedule the different functions and looks parallel activities.  Retrieving (or synchronizaing) time and weather data takes long time than usual and scheduler would help in keep running the clock.  https://www.arduino.cc/en/Tutorial/MultipleBlinks
+- Maybe a simple piezzo buzzer to alarm.  Controllable from Webserver.  
+
+V0.1 Video 
+
+https://www.youtube.com/watch?v=pELyMVJ7KlI
