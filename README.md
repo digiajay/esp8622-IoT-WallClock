@@ -13,5 +13,7 @@ This will be a simple project on Wemos D1 Mini for building an IoT Clock.
 - Maybe a simple piezzo buzzer to alarm.  Controllable from Webserver.  
 
 V0.1 Video 
+[![First version V0.1 of the wall clock](http://img.youtube.com/vi/pELyMVJ7KlI/0.jpg)](https://www.youtube.com/watch?v=pELyMVJ7KlI)
 
-https://www.youtube.com/watch?v=pELyMVJ7KlI
+## Personification features
+- Random cooking menu items.  Personally I always find hard to list out the items out of my mind.
