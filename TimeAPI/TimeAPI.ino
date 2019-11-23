@@ -27,6 +27,9 @@ DynamicJsonDocument doc(capacity);
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
+#include "ClosedCube_HDC1080.h"
+ClosedCube_HDC1080 hdc1080;
+
 /* For WiFi connection and http API requests */
 WiFiClient client;
 HTTPClient http;
@@ -34,13 +37,15 @@ HTTPClient http;
 //Globals
 long sys_sunset, sys_sunrise;
 float main_temp_celcius, main_min_temp_celcius, main_max_temp_celcius = -273.15;
-String week;
+String week, LocalTemperature, LocalRH;
 
 //Setup before starting the loop
 void setup()
 {
   lcd.init();
   lcd.backlight();
+
+  hdc1080.begin(0x40);
 
   Serial.begin(115200);
   // Serial.setDebugOutput(true);
@@ -69,33 +74,46 @@ int displaySwitch=0; //For alternatively displaying time, temprature and sun tim
 //Main loop which iterates all the time
 void loop()
 {
+  Serial.print("weatherAPI Counter:       " + String(weatherAPIcalls) + "\n");
+  Serial.print("displaySwitch Counter:         " + String(displaySwitch) + "\n");
+  Serial.print("timeAPI Counter:                    " + String(timeAPIcalls) + "\n");
+  
   //Call time API to sync time at every 1 minute.  Loop runs at 500ms
   if(timeAPIcalls%120 == 0)
     getTimeDate();
+  
   //Call weather API to sync at every 2 minute.  Loop runs at 500ms
+  if(weatherAPIcalls%30 == 0)
+    postLocalWeather();
   if(weatherAPIcalls%240 == 0)
+  {
     getWeatherData();
+    weatherAPIcalls = 0;
+  }
 
   //switching to display the time and weather in interleave time. 
   switch (displaySwitch) {
-  case 10: //Diplay temperature detils at every 5 seconds for 2 seconds
-    if (main_max_temp_celcius > -270){
+  case 4: //Diplay temperature detils at every 5 seconds for 2 seconds
+    if (main_max_temp_celcius > -270)
       displayTemperature();
-      delay(2000);
-    }
     else
       getWeatherData();
     break;
-  case 20://Diplay sun timings at every 5 seconds for 2 seconds
+  case 8://Diplay sun timings at every 5 seconds for 2 seconds
     displaySun();
-    displaySwitch = 0;
-    delay(2000);
     break;
-  default://By default in other free time display times.
+  case 12://By default in other free time display times.
     if (timeStatus() != timeNotSet)
       displayClock();
     else
       getTimeDate();
+    break;
+  case 16:
+    dispLocTempRH();
+    displaySwitch = 0;
+    break;
+  default:
+    //don't change display
     break;
   }
 
@@ -130,6 +148,16 @@ void displayTemperature()
   Serial.print("[DisplayTemperature] " + Line1 + "\n" + Line2 + "\n");
 }
 
+void dispLocTempRH()
+{  
+  String LocalTemperature = "AmbT : " + String(hdc1080.readTemperature()) + "\"C     ";
+  String LocalRH = "AmbRH: " + String(hdc1080.readHumidity()) + "%       ";
+  lcd.setCursor(0, 0);
+  lcd.print(LocalTemperature);
+  lcd.setCursor(0, 1);
+  lcd.print(LocalRH);
+}
+
 //Display the sunrise and sunset time in the LCD display.
 void displaySun()
 {
@@ -161,13 +189,10 @@ void getTimeDate()
   // wait for WiFi connection
   if ((WiFi.status() == WL_CONNECTED))
   {
-    Serial.print("[HTTP] begin...\n");
-    Serial.print("[Request]" + timeURL);
-
     if (http.begin(client, timeURL))
     { // HTTP
 
-      Serial.print("[HTTP] GET...\n");
+      Serial.print("[HTTP] GET..." + timeURL + "\n");
       // start connection and send HTTP header
       int httpCode = http.GET();
 
@@ -181,7 +206,7 @@ void getTimeDate()
         if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
         {
           String payload = http.getString();
-          Serial.println(payload);
+          Serial.println("[HTTP] Payload: " + payload);
           deserializeJson(doc, payload);
           int week_number = doc["week_number"];
           const char *datetime = doc["datetime"];
@@ -209,7 +234,7 @@ void getWeatherData()
   String OpenWeatherMapURL = "http://api.openweathermap.org/data/2.5/weather?q=Galway&APPID=7f204cf6049360470bba69ef0c217db1";
   if (http.begin(client, OpenWeatherMapURL))
   { // HTTP
-    Serial.print("[HTTP] GET...\n");
+    Serial.print("[HTTP] GET..." + OpenWeatherMapURL + "\n");
     // start connection and send HTTP header
     int httpCode = http.GET();
 
@@ -223,7 +248,7 @@ void getWeatherData()
       if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
       {
         String payload = http.getString();
-        Serial.println(payload);
+        Serial.println("[HTTP] Payload: " + payload);
         deserializeJson(doc, payload);
 
         JsonObject main = doc["main"];
@@ -255,4 +280,39 @@ void getWeatherData()
   {
     Serial.printf("[HTTP] Unable to connect\n");
   }
+}
+
+//Call API to post the current weather to internet
+void postLocalWeather()
+{
+  String postURL = "http://api.thingspeak.com/update?api_key=3DTOSYVV3Q0MWZAN&field1=" + String(hdc1080.readTemperature()) + String("&field2=") + String(hdc1080.readHumidity());
+    if (http.begin(client, postURL))
+    { // HTTP
+      Serial.print("[HTTP] GET..." + postURL + "\n");
+      // start connection and send HTTP header
+      int httpCode = http.GET();
+
+      // httpCode will be negative on error
+      if (httpCode > 0)
+      {
+        // HTTP header has been send and Server response header has been handled
+        Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+
+        // file found at server
+        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
+        {
+          String payload = http.getString();
+          Serial.println("[HTTP] Payload: " + payload);
+        }
+      }
+      else
+      {
+        Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+      }
+      http.end();
+    }
+    else
+    {
+      Serial.printf("[HTTP] Unable to connect\n");
+    }
 }
